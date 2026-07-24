@@ -1,0 +1,6 @@
+{
+  "name": "Flappy Bird Arcade",
+  "description": "A retro-inspired 2D Flappy Bird arcade game with procedural Web Audio synth sound effects, customizable map themes, and light/dark mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
