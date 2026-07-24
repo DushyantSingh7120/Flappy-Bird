@@ -1,12 +1,13 @@
 {
-  "name": "Flappy Bird",
+  "id": "/",
+  "name": "Flappy D.Bird",
   "short_name": "Flappy",
-  "description": "Play Flappy Bird online created by Dushyant Singh",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#f97316",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
   "orientation": "portrait",
+  "categories": ["games", "entertainment"],
   "icons": [
     {
       "src": "/icon.png",
