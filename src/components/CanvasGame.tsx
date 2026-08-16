@@ -18,12 +18,29 @@ const BIRD_X = 110;
 const BIRD_RADIUS = 18;
 
 // Physics constants
-const GRAVITY = 1250; // px/s^2
-const FLAP_IMPULSE = -380; // px/s
-const PIPE_SPEED = 185; // px/s
+const GRAVITY = 1250;           // px/s² — positive: pulls downward (canvas Y increases down)
+const FLAP_IMPULSE = -380;      // px/s  — negative: pushes upward (assigned, never added)
+const MAX_FALL_SPEED = 700;     // px/s  — terminal velocity cap, prevents runaway acceleration
+const PIPE_SPEED = 185;         // px/s
 const PIPE_SPAWN_INTERVAL = 1.65; // seconds
-const PIPE_GAP = 160; // px gap between top & bottom pipes
+const PIPE_GAP = 160;           // px gap between top & bottom pipes
 const MIN_PIPE_HEIGHT = 70;
+
+// Collision hitbox: inset ~17% on every edge so the mathematical box
+// is smaller than the visual sprite — gives players a fairer, more forgiving feel.
+// BIRD_RADIUS=18 → inset 3px → effective half-extent = 15px on all axes.
+const BIRD_HITBOX_INSET = 3;    // px shaved from each edge of the bounding circle radius
+const BIRD_HIT_R = BIRD_RADIUS - BIRD_HITBOX_INSET; // = 15
+
+// Visual rotation limits (radians). These are PURELY cosmetic — birdRotation
+// is never read by collision code. The AABB hitbox is always axis-aligned.
+const ROT_UP_MAX   = -Math.PI / 7;   // ≈ −25.7° — subtle nose-up on jump
+const ROT_DOWN_MAX =  Math.PI / 2;   // = +90°   — full nose-down at terminal velocity
+const ROT_VEL_SCALE = 0.0028;        // maps px/s velocity → radians target angle
+const ROT_LERP_SPEED = 12;           // lerp coefficient — higher = snappier tracking
+
+// Toggle true to render red outlines around every hitbox for visual QA.
+const DEBUG_HITBOXES = false;
 
 export const CanvasGame: React.FC<CanvasGameProps> = ({
   gameMode,
@@ -153,6 +170,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Reset sentinel so the first frame of this loop instance is always a clean start
+    lastTimeRef.current = 0;
     let running = true;
 
     const render = (time: number) => {
@@ -162,21 +181,25 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       let dt = (time - lastTimeRef.current) / 1000;
       lastTimeRef.current = time;
 
-      // Cap dt to prevent huge jumps after tab pause
-      if (dt > 0.1) dt = 0.016;
+      // Clamp dt to 50 ms max — absorbs the safe budget after a tab-hide/restore
+      // without physics tunneling or frame-time loss
+      if (dt > 0.05) dt = 0.05;
 
       const state = gameState.current;
 
       // Update logic if playing
       if (gameMode === 'playing') {
-        // Apply Gravity
+        // Apply Gravity then clamp to terminal velocity
         state.birdVelocity += GRAVITY * dt;
+        if (state.birdVelocity > MAX_FALL_SPEED) state.birdVelocity = MAX_FALL_SPEED;
         state.birdY += state.birdVelocity * dt;
 
-        // Smooth rotation based on velocity
-        // upward speed -> -25deg (-0.44 rad), downward speed -> +70deg (+1.22 rad)
-        const targetRot = Math.min(Math.PI / 2.5, Math.max(-Math.PI / 7, state.birdVelocity * 0.0028));
-        state.birdRotation += (targetRot - state.birdRotation) * 12 * dt;
+        // Visual-only rotation — lerp current angle toward velocity-derived target.
+        // birdRotation is NEVER read by AABB collision code; hitboxes remain axis-aligned.
+        // Mapping: FLAP_IMPULSE (−380 px/s) → ROT_UP_MAX (≈−26°)
+        //          MAX_FALL_SPEED (+700 px/s) → ROT_DOWN_MAX (+90°)
+        const targetRot = Math.min(ROT_DOWN_MAX, Math.max(ROT_UP_MAX, state.birdVelocity * ROT_VEL_SCALE));
+        state.birdRotation += (targetRot - state.birdRotation) * ROT_LERP_SPEED * dt;
 
         // Wing flap cycle decay
         state.wingPhase = Math.max(0, state.wingPhase - 3 * dt);
@@ -247,20 +270,38 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           }
         }
 
-        // Collision Detection
-        const currentGroundY = GAME_HEIGHT - GROUND_HEIGHT;
+        // ── Collision Detection (Inset AABB) ───────────────────────────────────
+        // Bird hitbox: axis-aligned rectangle, inset ~17% from visual radius on
+        // every edge. Purely rectangular — no rotation, no trig.
+        const groundY = GAME_HEIGHT - GROUND_HEIGHT;
+        const bHitLeft   = BIRD_X      - BIRD_HIT_R;
+        const bHitRight  = BIRD_X      + BIRD_HIT_R;
+        const bHitTop    = state.birdY - BIRD_HIT_R;
+        const bHitBottom = state.birdY + BIRD_HIT_R;
 
-        // Ground / Ceiling hit
-        if (state.birdY + BIRD_RADIUS >= currentGroundY || state.birdY - BIRD_RADIUS <= 0) {
+        // Ground hit — clamp Y so sprite rests visually on the floor before
+        // game-over fires, preventing the bird from sinking into the ground.
+        if (bHitBottom >= groundY) {
+          state.birdY = groundY - BIRD_HIT_R; // snap to floor surface
+          state.birdVelocity = 0;
           triggerGameOver('ground');
         }
 
-        // Pipe collision hit
+        // Ceiling hit
+        if (bHitTop <= 0) {
+          state.birdY = BIRD_HIT_R; // snap to ceiling surface
+          state.birdVelocity = 0;
+          triggerGameOver('ground');
+        }
+
+        // Pipe AABB collision — pipe visual matches its logical rectangle exactly,
+        // so no inset is applied to the pipe side.
         for (const pipe of state.pipes) {
-          // Check X bounds
-          if (BIRD_X + BIRD_RADIUS > pipe.x && BIRD_X - BIRD_RADIUS < pipe.x + pipe.width) {
-            // Check Y bounds (top pipe or bottom pipe)
-            if (state.birdY - BIRD_RADIUS < pipe.topHeight || state.birdY + BIRD_RADIUS > GAME_HEIGHT - GROUND_HEIGHT - pipe.bottomHeight) {
+          const pipeBottomEdge = groundY - pipe.bottomHeight;
+          // X overlap
+          if (bHitRight > pipe.x && bHitLeft < pipe.x + pipe.width) {
+            // Y overlap with top pipe or bottom pipe
+            if (bHitTop < pipe.topHeight || bHitBottom > pipeBottomEdge) {
               triggerGameOver('pipe');
               break;
             }
@@ -415,6 +456,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       // Draw Tap Animations & Indicators
       drawTapIndicators(ctx, state.tapIndicators);
 
+      // Debug hitbox outlines (set DEBUG_HITBOXES = true to enable)
+      if (DEBUG_HITBOXES) {
+        drawDebugHitboxes(ctx, state.birdY, state.pipes);
+      }
+
       ctx.restore();
 
       animFrameId.current = requestAnimationFrame(render);
@@ -461,7 +507,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
     return () => {
       running = false;
-      if (animFrameId.current) cancelAnimationFrame(animFrameId.current);
+      if (animFrameId.current !== null) {
+        cancelAnimationFrame(animFrameId.current);
+        animFrameId.current = null; // prevent stale-ID from cancelling a future unrelated frame
+      }
     };
   }, [gameMode, settings.mapTheme, settings.colorMode, colors, onScoreChange, onGameOver]);
 
@@ -527,6 +576,37 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 };
 
 // --- DRAWING HELPER FUNCTIONS ---
+
+/**
+ * DEBUG ONLY — renders red AABB outlines matching the exact collision boxes.
+ * Bird box uses BIRD_HIT_R (inset). Pipe boxes match their visual rectangle exactly.
+ * Enable by setting DEBUG_HITBOXES = true at the top of this file.
+ */
+function drawDebugHitboxes(ctx: CanvasRenderingContext2D, birdY: number, pipes: Pipe[]) {
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#ff0000';
+  ctx.lineWidth = 1.5;
+
+  // Bird inset AABB
+  ctx.strokeRect(
+    BIRD_X    - BIRD_HIT_R,
+    birdY     - BIRD_HIT_R,
+    BIRD_HIT_R * 2,
+    BIRD_HIT_R * 2,
+  );
+
+  // Pipe AABBs (top + bottom, no inset)
+  const groundY = GAME_HEIGHT - GROUND_HEIGHT;
+  for (const pipe of pipes) {
+    // Top pipe rectangle
+    ctx.strokeRect(pipe.x, 0, pipe.width, pipe.topHeight);
+    // Bottom pipe rectangle
+    ctx.strokeRect(pipe.x, groundY - pipe.bottomHeight, pipe.width, pipe.bottomHeight);
+  }
+
+  ctx.restore();
+}
 
 function drawTapIndicators(ctx: CanvasRenderingContext2D, tapIndicators: TapIndicator[]) {
   ctx.save();
@@ -971,6 +1051,8 @@ function drawCharacter(
   birdSkin: BirdSkin,
   colors: ReturnType<typeof getThemeColors>
 ) {
+  // ctx.save/restore fully scopes translate+rotate to this sprite only.
+  // No rotation state leaks to background layers, pipes, particles, or the UI overlay.
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
