@@ -18,26 +18,26 @@ const BIRD_X = 110;
 const BIRD_RADIUS = 18;
 
 // Physics constants
-const GRAVITY = 1250;           // px/s² — positive: pulls downward (canvas Y increases down)
-const FLAP_IMPULSE = -380;      // px/s  — negative: pushes upward (assigned, never added)
+const GRAVITY = 1050;           // px/s² — softened for a rounder, parabolic jump arc
+const FLAP_IMPULSE = -340;      // px/s  — lighter impulse matches the lower gravity feel
 const MAX_FALL_SPEED = 700;     // px/s  — terminal velocity cap, prevents runaway acceleration
 const PIPE_SPEED = 185;         // px/s
 const PIPE_SPAWN_INTERVAL = 1.65; // seconds
 const PIPE_GAP = 160;           // px gap between top & bottom pipes
 const MIN_PIPE_HEIGHT = 70;
 
-// Collision hitbox: inset ~17% on every edge so the mathematical box
+// Collision hitbox: inset ~28% on every edge so the mathematical box
 // is smaller than the visual sprite — gives players a fairer, more forgiving feel.
-// BIRD_RADIUS=18 → inset 3px → effective half-extent = 15px on all axes.
-const BIRD_HITBOX_INSET = 3;    // px shaved from each edge of the bounding circle radius
-const BIRD_HIT_R = BIRD_RADIUS - BIRD_HITBOX_INSET; // = 15
+// BIRD_RADIUS=18 → inset 5px → effective half-extent = 13px on all axes.
+const BIRD_HITBOX_INSET = 5;    // px shaved from each edge of the bounding circle radius
+const BIRD_HIT_R = BIRD_RADIUS - BIRD_HITBOX_INSET; // = 13
 
 // Visual rotation limits (radians). These are PURELY cosmetic — birdRotation
 // is never read by collision code. The AABB hitbox is always axis-aligned.
-const ROT_UP_MAX   = -Math.PI / 7;   // ≈ −25.7° — subtle nose-up on jump
-const ROT_DOWN_MAX =  Math.PI / 2;   // = +90°   — full nose-down at terminal velocity
+const ROT_UP_MAX   = -Math.PI / 6;   // ≈ −30° — gentle nose-up tilt at jump peak
+const ROT_DOWN_MAX =  Math.PI / 2;   // = +90°  — full nose-down at terminal velocity
 const ROT_VEL_SCALE = 0.0028;        // maps px/s velocity → radians target angle
-const ROT_LERP_SPEED = 12;           // lerp coefficient — higher = snappier tracking
+const ROT_LERP_SPEED = 7;            // lerp coefficient — lowered for smooth eased arc rotation
 
 // Toggle true to render red outlines around every hitbox for visual QA.
 const DEBUG_HITBOXES = false;
@@ -194,10 +194,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         if (state.birdVelocity > MAX_FALL_SPEED) state.birdVelocity = MAX_FALL_SPEED;
         state.birdY += state.birdVelocity * dt;
 
-        // Visual-only rotation — lerp current angle toward velocity-derived target.
+        // Visual-only rotation — smoothly lerp current angle toward velocity-derived target.
         // birdRotation is NEVER read by AABB collision code; hitboxes remain axis-aligned.
-        // Mapping: FLAP_IMPULSE (−380 px/s) → ROT_UP_MAX (≈−26°)
+        // Mapping: FLAP_IMPULSE (−340 px/s) → ROT_UP_MAX (≈−30°)
         //          MAX_FALL_SPEED (+700 px/s) → ROT_DOWN_MAX (+90°)
+        // ROT_LERP_SPEED=7 ensures the tilt eases in/out like a smooth arc, not a snap.
         const targetRot = Math.min(ROT_DOWN_MAX, Math.max(ROT_UP_MAX, state.birdVelocity * ROT_VEL_SCALE));
         state.birdRotation += (targetRot - state.birdRotation) * ROT_LERP_SPEED * dt;
 
