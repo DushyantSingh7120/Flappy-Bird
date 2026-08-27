@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="crispEdges">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+  </defs>
+
+  <!-- Arcade Icon Background -->
+  <rect width="32" height="32" rx="7" fill="url(#bgGrad)" shape-rendering="auto"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" fill="none" stroke="#38bdf8" stroke-opacity="0.3" stroke-width="1" shape-rendering="auto"/>
+
+  <!-- Pixel Flappy Bird (2x2 pixel grid, 12x10 pixels, offset x=4, y=6) -->
+  <!-- Outline / Black (#020617) -->
+  <rect x="10" y="6" width="8" height="2" fill="#020617" />
+  <rect x="8" y="8" width="2" height="2" fill="#020617" />
+  <rect x="18" y="8" width="4" height="2" fill="#020617" />
+  <rect x="6" y="10" width="2" height="2" fill="#020617" />
+  <rect x="22" y="10" width="2" height="4" fill="#020617" />
+  <rect x="4" y="12" width="2" height="8" fill="#020617" />
+  <rect x="26" y="14" width="2" height="6" fill="#020617" />
+  <rect x="18" y="14" width="2" height="4" fill="#020617" />
+  <rect x="20" y="20" width="6" height="2" fill="#020617" />
+  <rect x="16" y="20" width="4" height="2" fill="#020617" />
+  <rect x="6" y="20" width="2" height="2" fill="#020617" />
+  <rect x="8" y="22" width="2" height="2" fill="#020617" />
+  <rect x="10" y="24" width="8" height="2" fill="#020617" />
+  <rect x="18" y="22" width="2" height="2" fill="#020617" />
+
+  <!-- Bird Body Yellow (#facc15) & Amber Shadow (#f59e0b) -->
+  <rect x="10" y="8" width="8" height="2" fill="#fde047" />
+  <rect x="8" y="10" width="8" height="2" fill="#facc15" />
+  <rect x="6" y="12" width="10" height="2" fill="#facc15" />
+  <rect x="6" y="14" width="12" height="2" fill="#facc15" />
+  <rect x="12" y="16" width="6" height="2" fill="#f59e0b" />
+  <rect x="12" y="18" width="4" height="2" fill="#f59e0b" />
+  <rect x="8" y="20" width="8" height="2" fill="#d97706" />
+  <rect x="10" y="22" width="8" height="2" fill="#b45309" />
+
+  <!-- Eye White (#ffffff) & Pupil (#020617) -->
+  <rect x="16" y="10" width="6" height="4" fill="#ffffff" />
+  <rect x="18" y="12" width="2" height="2" fill="#020617" />
+
+  <!-- Wing White (#ffffff) & Light Yellow (#fef08a) -->
+  <rect x="6" y="16" width="6" height="2" fill="#ffffff" />
+  <rect x="6" y="18" width="6" height="2" fill="#fef08a" />
+
+  <!-- Beak Orange (#f97316) & Dark Orange (#ea580c) -->
+  <rect x="20" y="14" width="6" height="2" fill="#fb923c" />
+  <rect x="20" y="16" width="6" height="2" fill="#f97316" />
+  <rect x="20" y="18" width="6" height="2" fill="#ea580c" />
+  <rect x="18" y="18" width="2" height="2" fill="#ea580c" />
+</svg>
